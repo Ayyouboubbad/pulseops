@@ -94,7 +94,18 @@ cd backend
 npm install
 npm run dev
 ```
+### 2. Démarrer le Frontend Core
+```bash
+cd frontend
+npm install
+npm run dev
+```
+### 2. Démarrer le Worker Core
+```bash
+cd worker
+npm install
+npm run dev
+```
 
-### 3. Tester la santé du Backend & de la Queue Redis
-- Health check complet : `GET http://localhost:5000/api/health`
-- Enqueue d'un test job BullMQ : `POST http://localhost:5000/api/health/test-queue`
+### 3. Tester la santé du App 
+- Health check complet : `GET http://localhost:5173/`

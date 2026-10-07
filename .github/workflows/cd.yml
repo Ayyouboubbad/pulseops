@@ -59,28 +59,20 @@ jobs:
           script: |
             echo "🚀 [Deploy] Starting PulseOps Deployment on VPS..."
             
-            # 1. Naviguer vers le dossier de déploiement
             APP_DIR="/opt/pulseops"
             if [ ! -d "$APP_DIR" ]; then
               echo "📁 Cloning repository into $APP_DIR..."
-              git clone ${{ github.server_url }}/${{ github.repository }}.git $APP_DIR
+              git clone https://github.com/Ayyouboubbad/pulseops.git $APP_DIR
             fi
             
             cd $APP_DIR
-            
-            # 2. Récupérer la dernière version de main
-            echo "📥 Fetching latest commits..."
             git fetch origin main
             git reset --hard origin/main
             
-            # 3. Build & Déploiement des conteneurs
             echo "🐳 Building and restarting Docker containers..."
             docker compose -f docker-compose.prod.yml pull redis mongodb reverse-proxy || true
-            docker compose -f docker-compose.prod.yml build --no-cache
+            docker compose -f docker-compose.prod.yml build
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            
-            # 4. Nettoyage des images orphelines (DevOps Housekeeping)
-            echo "🧹 Cleaning up dangling images..."
             docker image prune -f
             
             echo "✅ [Deploy] PulseOps deployed successfully on VPS!"

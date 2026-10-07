@@ -3,6 +3,10 @@ node_modules/
 .pnp
 .pnp.js
 
+# Legacy directories
+Z--it/
+Surveillance-pro/
+
 # Environment variables
 .env
 .env.*

@@ -1,0 +1,87 @@
+name: PulseOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  # Étape 1 : Validation de l'intégrité du code
+  lint-and-validate:
+    name: Code Integrity & Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: backend/package.json
+
+      - name: Install & Validate Backend
+        run: |
+          cd backend
+          npm ci
+          node --check src/server.js
+          node --check src/app.js
+
+      - name: Install & Validate Worker
+        run: |
+          cd worker
+          npm ci
+          node --check src/index.js
+          node --check src/worker.js
+
+      - name: Install & Build Frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+  # Étape 2 : Déploiement Continu vers le VPS Cloud via SSH
+  deploy-to-vps:
+    name: Continuous Deployment (Cloud VPS)
+    needs: lint-and-validate
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy multi-container stack via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_SSH_HOST }}
+          username: ${{ secrets.VPS_SSH_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            echo "🚀 [Deploy] Starting PulseOps Deployment on VPS..."
+            
+            # 1. Naviguer vers le dossier de déploiement
+            APP_DIR="/opt/pulseops"
+            if [ ! -d "$APP_DIR" ]; then
+              echo "📁 Cloning repository into $APP_DIR..."
+              git clone ${{ github.server_url }}/${{ github.repository }}.git $APP_DIR
+            fi
+            
+            cd $APP_DIR
+            
+            # 2. Récupérer la dernière version de main
+            echo "📥 Fetching latest commits..."
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # 3. Build & Déploiement des conteneurs
+            echo "🐳 Building and restarting Docker containers..."
+            docker compose -f docker-compose.prod.yml pull redis mongodb reverse-proxy || true
+            docker compose -f docker-compose.prod.yml build --no-cache
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            
+            # 4. Nettoyage des images orphelines (DevOps Housekeeping)
+            echo "🧹 Cleaning up dangling images..."
+            docker image prune -f
+            
+            echo "✅ [Deploy] PulseOps deployed successfully on VPS!"
+            docker compose -f docker-compose.prod.yml ps
